@@ -20,6 +20,7 @@ enum StripeNativeError: Error {
     case MissingMerchantIdentifier
     case MissingMerchantName
     case StripeCannotSubmitPayment
+    case CountryKeyIsInvalid
     case FunctionDoesNotExist
     case CardCollectionFailure
     case PaymentParameterTypeMismatch
@@ -147,6 +148,11 @@ public class SwiftStripeNativePlugin: NSObject, FlutterPlugin, PKPaymentAuthoriz
         
         paymentRequest.paymentSummaryItems.append(PKPaymentSummaryItem(label: name, amount: NSDecimalNumber(floatLiteral: total)))
         
+        guard isCountryCodeValid(request: paymentRequest) else {
+            hand(errors: [StripeNativeError.CountryKeyIsInvalid])
+            return
+        }
+        
         if Stripe.canSubmitPaymentRequest(paymentRequest), let paymentAuthorizationViewController = PKPaymentAuthorizationViewController(paymentRequest: paymentRequest) {
             paymentAuthorizationViewController.delegate = self
             UIApplication.shared.keyWindow?.rootViewController?.present(paymentAuthorizationViewController, animated: true)
@@ -173,6 +179,11 @@ public class SwiftStripeNativePlugin: NSObject, FlutterPlugin, PKPaymentAuthoriz
             PKPaymentSummaryItem(label: "Subtotal", amount: NSDecimalNumber(floatLiteral: payment.subtotal)),
             PKPaymentSummaryItem(label: payment.merchantName, amount: NSDecimalNumber(floatLiteral: total)),
         ]
+        
+        guard isCountryCodeValid(request: paymentRequest) else {
+            hand(errors: [StripeNativeError.CountryKeyIsInvalid])
+            return
+        }
         
         if Stripe.canSubmitPaymentRequest(paymentRequest), let paymentAuthorizationViewController = PKPaymentAuthorizationViewController(paymentRequest: paymentRequest) {
             paymentAuthorizationViewController.delegate = self
@@ -218,6 +229,14 @@ public class SwiftStripeNativePlugin: NSObject, FlutterPlugin, PKPaymentAuthoriz
         controller.dismiss(animated: true, completion: nil)
     }
     
+    private func isCountryCodeValid(request: PKPaymentRequest) -> Bool {
+        
+        guard let supported = request.supportedCountries else { return false }
+        
+        return supported.contains(countryKey)
+        
+    }
+    
     private func hand(errors: [Error]) {
         completion?(PKPaymentAuthorizationResult(status: PKPaymentAuthorizationStatus.failure, errors: errors))
         
@@ -227,4 +246,5 @@ public class SwiftStripeNativePlugin: NSObject, FlutterPlugin, PKPaymentAuthoriz
         
         self.flutterResult?(errorsDescription)
     }
+    
 }
